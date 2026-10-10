@@ -2,72 +2,72 @@
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
-    <!-- iOS specifikus beállítások, hogy alkalmazás-szerű legyen és alkalmazkodjon -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Teljes képernyős nézet kikényszerítése, belenagyítás tiltása -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="theme-color" content="#000000">
     <title>Pontos Idő</title>
     
-    <!-- NoSleep.js a képernyő ébrentartásához (régi és új eszközökön is) -->
     <script src="https://cdn.jsdelivr.net/npm/nosleep.js@0.12.0/dist/NoSleep.min.js"></script>
     
     <style>
-        /* Régi iOS bug javítása: stabil 100% magasság és erőszakos fekete háttér */
-        html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
+        /* iOS 12.5.5 Safari javítás: Brutális fekete háttér minden létező szinten */
+        html {
             background-color: #000000 !important;
-            color: #ffffff !important;
-            font-family: monospace;
-            overflow: hidden; /* Nincs görgetés */
+            background: #000000 !important;
         }
         
-        /* Régi böngészőkkel is kompatibilis középre igazítás */
         body {
-            display: -webkit-box;
-            display: -webkit-flex;
+            background-color: #000000 !important;
+            background: #000000 !important;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            position: fixed; /* Megakadályozza a görgetést, ami előhozhatná a fehér hátteret */
+            top: 0;
+            left: 0;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace; /* Biztonságos monospace iOS 12-n */
+        }
+        
+        /* A tartalmat tartó doboz, ami a body helyett végzi a középre igazítást */
+        #container {
             display: flex;
-            -webkit-box-orient: vertical;
-            -webkit-box-direction: normal;
-            -webkit-flex-direction: column;
             flex-direction: column;
-            -webkit-box-align: center;
-            -webkit-align-items: center;
-            align-items: center;
-            -webkit-box-pack: center;
-            -webkit-justify-content: center;
             justify-content: center;
-            text-align: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            background-color: #000000 !important;
         }
 
         #clock {
-            /* Képernyőszélességhez alkalmazkodó méret */
-            font-size: 18vw; 
+            /* 20vw azt jelenti, hogy 1 karakter kb a képernyő szélességének 1/8-a. 
+               Mivel 8 karakter a "00:00:00", ez teljesen faltól falig ér majd. */
+            font-size: 20vw; 
             font-weight: bold;
             line-height: 1;
-            white-space: nowrap; /* Ne törjön két sorba */
+            white-space: nowrap;
+            text-align: center;
         }
 
         #date {
+            /* A dátum kisebb, a képernyő szélességének 6%-a */
             font-size: 6vw;
             margin-top: 2vh;
             opacity: 0.8;
             white-space: nowrap;
+            text-align: center;
         }
 
-        /* Ha a képernyő fekvő (iPad) vagy asztali, egy kicsit kisebb betűk is elegek */
-        @media (min-aspect-ratio: 1/1) {
-            #clock { font-size: 14vw; }
-            #date { font-size: 4vw; }
-        }
-
-        /* Kezdőképernyő stílusai */
+        /* Indítóképernyő továbbra is kell az ébrentartás miatt */
         #start-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background-color: #000000;
+            background-color: #000000 !important;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -76,66 +76,53 @@
         }
 
         #start-btn {
-            font-size: 5vw;
+            font-size: 24px;
             padding: 20px 40px;
-            background-color: #333333;
+            background-color: #222222;
             color: #ffffff;
             border: 2px solid #ffffff;
             border-radius: 15px;
             cursor: pointer;
-            font-family: monospace;
+            font-family: inherit;
         }
 
         #start-overlay p {
-            margin-top: 30px;
-            font-size: 4vw;
+            margin-top: 20px;
+            font-size: 18px;
             color: #aaaaaa;
             text-align: center;
-            padding: 0 20px;
-        }
-        
-        @media (min-aspect-ratio: 1/1) {
-            #start-btn { font-size: 2.5vw; }
-            #start-overlay p { font-size: 2vw; }
+            padding: 0 10px;
         }
     </style>
 </head>
 <body>
-    <!-- Ez a felület fogadja a kattintást, hogy aktiválhassuk az ébrentartást -->
     <div id="start-overlay">
         <button id="start-btn">Óra indítása</button>
-        <p>A képernyő ébrentartásához bökj a gombra!</p>
+        <p>Bökj a gombra az elalvás-védelemhez!</p>
     </div>
 
-    <!-- Maga az óra -->
-    <div id="clock">Betöltés...</div>
-    <div id="date"></div>
+    <!-- Csomagoló div, ami garantálja a fekete hátteret -->
+    <div id="container">
+        <div id="clock">Betöltés</div>
+        <div id="date"></div>
+    </div>
 
     <script>
-        // 1. Ébrentartás (Wake Lock) és Indítás logikája
         let noSleep = null;
         if (typeof NoSleep !== 'undefined') {
             noSleep = new NoSleep();
         }
 
         document.getElementById('start-btn').addEventListener('click', function() {
-            // Ébrentartás engedélyezése kattintás után
             if (noSleep) {
                 noSleep.enable();
             } else if ('wakeLock' in navigator) {
                 navigator.wakeLock.request('screen').catch(function(err) {});
             }
             
-            // Indító képernyő eltüntetése
             document.getElementById('start-overlay').style.display = 'none';
-            
-            // Opcionális: Teljes képernyő kérése (nem minden iOS támogatja, de megpróbáljuk)
-            let docEl = document.documentElement;
-            if (docEl.requestFullscreen) { docEl.requestFullscreen().catch(function(){}); }
-            else if (docEl.webkitRequestFullscreen) { docEl.webkitRequestFullscreen(); }
         });
 
-        // 2. Pontos idő logikája
         let timeOffset = 0;
         const clockElement = document.getElementById('clock');
         const dateElement = document.getElementById('date');
@@ -167,7 +154,7 @@
                 const serverTime = new Date(data.datetime).getTime();
                 timeOffset = serverTime - Date.now() + latency;
             } catch (error) {
-                console.error('Szerver szinkronizáció sikertelen (lehet, hogy régi az iPad tanúsítványa), helyi időt használunk.', error);
+                console.error('Szerver hiba, a helyi gépidőt használjuk.', error);
             }
             
             updateDisplay();
