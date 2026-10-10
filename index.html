@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pontos Idő</title>
+    <style>
+        body {
+            background-color: black;
+            color: white;
+            font-family: monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            text-align: center;
+        }
+        #clock {
+            font-size: 8rem;
+            font-weight: bold;
+        }
+        #date {
+            font-size: 3rem;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="clock">Betöltés...</div>
+    <div id="date"></div>
+
+    <script>
+        let timeOffset = 0;
+        const clockElement = document.getElementById('clock');
+        const dateElement = document.getElementById('date');
+
+        const daysShort = ['V', 'H', 'K', 'Sze', 'Cs', 'P', 'Szo'];
+
+        function updateDisplay() {
+            // Aktuális idő kiszámítása a szerver offszet alapján
+            const now = new Date(Date.now() + timeOffset);
+            
+            // Óra, perc, másodperc (24 órás formátum, vezető nullákkal)
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+
+            // Dátum: év, hó, nap és rövidített napnév
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const dayOfWeek = daysShort[now.getDay()];
+            
+            dateElement.textContent = `${year}-${month}-${day} ${dayOfWeek}`;
+        }
+
+        async function syncTimeWithServer() {
+            try {
+                const localStart = Date.now();
+                // Szerveridő lekérése a WorldTimeAPI-n keresztül (Budapest időzóna)
+                const response = await fetch('https://worldtimeapi.org/api/timezone/Europe/Budapest');
+                const data = await response.json();
+                
+                // Hálózati késleltetés (latency) becslése a pontosabb idő érdekében
+                const latency = (Date.now() - localStart) / 2;
+                const serverTime = new Date(data.datetime).getTime();
+                
+                // Offszet meghatározása a helyi és a szerveridő között
+                timeOffset = serverTime - Date.now() + latency;
+            } catch (error) {
+                console.error('Nem sikerült lekérni az időt a szerverről, a helyi gép idejét használjuk.', error);
+            }
+            
+            // Azonnali frissítés és utána másodpercenkénti frissítés indítása
+            updateDisplay();
+            setInterval(updateDisplay, 1000);
+        }
+
+        syncTimeWithServer();
+    </script>
+</body>
+</html>
